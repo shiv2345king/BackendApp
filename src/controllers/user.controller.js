@@ -4,6 +4,8 @@ import {ApiErrors} from '../utils/ApiErrors.js';
 import {asyncHandler} from '../utils/asyncHandler.js'
 import {ApiResponse} from '../utils/ApiResponse.js'
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import fs from "fs/promises";  // use promise-based fs
 
 
 const generateAccessAndRefereshTokens = async(userId) =>{
@@ -166,58 +168,72 @@ const logoutUser = asyncHandler(async(req, res) => {
 
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
-     if (!incomingRefreshToken) {
-        throw new ApiErrors(400, "Refresh token is required");
-     }
-  try {
-      const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
 
-    const user  =  await User.findById(decodedToken?._id);
-    if(!user) {
-        throw new ApiErrors(404,"Invalid refresh token");
+    if (!incomingRefreshToken) {
+        throw new ApiError(401, "unauthorized request")
     }
-   
-     if(user?.refreshToken !== incomingRefreshToken) {
-         throw new ApiErrors(403,"Forbidden");
-     }
- 
-     const options = { 
-         httpOnly: true,
-         secure: true
-     };
- 
-     // generate new access token
-     const { accessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id);
- 
-     return res.status(200).cookie("accessToken",accessToken,options).cookie("refreshToken",newRefreshToken,options).json(
-         new ApiResponse(200, { accessToken, newRefreshToken }, "Access token refreshed successfully")
-     );
-   } catch (error) {
-       throw new ApiErrors(401, error?.message || "Invalid Refresh Token");
-   }
-});
 
-const changeCurrentPassword  = asyncHandler(async (req,res) => {
-    const {oldPassword,newPassword,confPassword} = req.body
+    try {
+        const decodedToken = jwt.verify(
+            incomingRefreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        )
+    
+        const user = await User.findById(decodedToken?._id)
+    
+        if (!user) {
+            throw new ApiError(401, "Invalid refresh token")
+        }
+    
+        if (incomingRefreshToken !== user?.refreshToken) {
+            throw new ApiError(401, "Refresh token is expired or used")
+            
+        }
+    
+        const options = {
+            httpOnly: true,
+            secure: true
+        }
+    
+        const {accessToken, newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
+    
+        return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", newRefreshToken, options)
+        .json(
+            new ApiResponse(
+                200, 
+                {accessToken, refreshToken: newRefreshToken},
+                "Access token refreshed"
+            )
+        )
+    } catch (error) {
+        throw new ApiError(401, error?.message || "Invalid refresh token")
+    }
 
-if(newPassword !== confPassword) {
-    throw new ApiErrors(400,"New password and confirmation password must match");
-}
+})
+const changeCurrentPassword = asyncHandler(async(req, res) => {
+    const {oldPassword, newPassword} = req.body
 
-const user = await User.findById(req.user?._id)
-const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
-if(!isPasswordCorrect) {
-    throw new ApiErrors(400,"Old password is incorrect");
+    
 
-}
+    const user = await User.findById(req.user?._id)
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
-user.password = newPassword;
-await user.save({ validateBeforeSave: false });
+    if (!isPasswordCorrect) {
+        throw new ApiError(400, "Invalid old password")
+    }
 
-return res.status(200)
-.json(new ApiResponse(200,{user},"Password changed successfully"));
-});
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"))
+})
+
 
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, req.user, "Current user fetched successfully"));
@@ -240,7 +256,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 });
 
 const updateUserAvatar = asyncHandler(async(req,res) => {
-    const avatarLocal = req.file?.avatar.path
+    const avatarLocal = req.file?.path
     if(!avatarLocal) {
         throw new ApiErrors(400,"Avatar image is required");
     }
@@ -259,7 +275,7 @@ const updateUserAvatar = asyncHandler(async(req,res) => {
     return res.status(200).json(new ApiResponse(200, user, "User avatar updated successfully"));
 });
 const updateUserCoverImage = asyncHandler(async(req,res) => {
-    const coverImageLocal = req.file?.coverImage.path
+    const coverImageLocal = req.file?.path
     if(!coverImageLocal) {
         throw new ApiErrors(400,"Cover image is required");
     }
@@ -277,26 +293,35 @@ const updateUserCoverImage = asyncHandler(async(req,res) => {
 
     return res.status(200).json(new ApiResponse(200, user, "User cover image updated successfully"));
 });
-const deleteLocalFiles = asyncHandler(async(req,res) => {
-    const avatarFilePath = req.file?.avatar.path
-    const coverImageFilePath = req.file?.coverImage.path
 
-    if(avatarFilePath) {
-       try {
-         fs.unlink(avatarFilePath)
-       } catch (error) {
-           console.error("Error deleting avatar file:", error);
-       }
+
+const deleteLocalFiles = asyncHandler(async (req, res) => {
+  const avatarFilePath = req.file?.avatar?.path;
+  const coverImageFilePath = req.file?.coverImage?.path;
+
+  try {
+    if (avatarFilePath) {
+      await fs.unlink(avatarFilePath);
+      console.log("Deleted avatar:", avatarFilePath);
     }
 
-    if(coverImageFilePath) {
-      try {
-          fs.unlink(coverImageFilePath)
-      } catch (error) {
-          console.error("Error deleting cover image file:", error);
-      }
+    if (coverImageFilePath) {
+      await fs.unlink(coverImageFilePath);
+      console.log("Deleted cover image:", coverImageFilePath);
     }
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Local files deleted successfully" });
+
+  } catch (error) {
+    console.error("Error deleting files:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error deleting local files" });
+  }
 });
+
 
 const getUserChannelProfile = asyncHandler(async(req,res) => {
     const {username} = req.params
@@ -368,8 +393,10 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
 
 const getWatchHistory = asyncHandler(async(req,res) => {
     const user = await User.aggregate([
-        {
-            _id: new mongoose.ObjectId(req.user?._id)
+        {  
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user?._id)
+            },
         },
         {
             $lookup: {

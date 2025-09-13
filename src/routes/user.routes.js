@@ -21,15 +21,18 @@ router.route("/register").post(
 );
 router.route("/login").post(loginUser);
 router.route("/logout").post(verifyJwt, logoutUser);
-router.route("/refresh_token").post(refreshAccessToken);
+router.route("/refresh-token").post(refreshAccessToken);
 router.route("/change-password").post(verifyJwt, changeCurrentPassword);
-router.route("/current_user").get(verifyJwt, getCurrentUser);
-router.route("/update_profile").patch(verifyJwt, updateAccountDetails);
+router.route("/current-user").get(verifyJwt, getCurrentUser);
+router.route("/update-profile").patch(verifyJwt, updateAccountDetails);
 router.route("/avatar").patch(verifyJwt, upload.single("avatar"), updateUserAvatar);
 router.route("/cover-image").patch(verifyJwt, upload.single("coverImage"), updateUserCoverImage);
-router.route("/delete_local_files").delete(verifyJwt, deleteLocalFiles);
+router.route("/delete-localFiles").delete(verifyJwt,  upload.fields([
+      { name: "avatar", maxCount: 1 },
+      { name: "coverImage", maxCount: 1 }
+    ]), deleteLocalFiles);
 router.route("/c/:username").get(verifyJwt, getUserChannelProfile);
-router.route("/watch_history").get(verifyJwt, getWatchHistory);
+router.route("/watch-history").get(verifyJwt, getWatchHistory);
 
 
 export default router;

@@ -22,5 +22,12 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 // ✅ Mount routes AFTER middleware
 import userRoutes from "./routes/user.routes.js";
 app.use("/api/v1/users", userRoutes);
-
+import videoRoutes from "./routes/video.routes.js";
+app.use("/api/v1/videos", videoRoutes);
+import likeRouter from "./routes/likes.routes.js"
+app.use("/api/v1/likes", likeRouter);
+import commentRouter from "./routes/comment.routes.js"
+app.use("/api/v1/comments", commentRouter)
+import tweetRouter from "./routes/tweet.routes.js"
+app.use("/api/v1/tweets", tweetRouter)
 export { app };
