@@ -30,4 +30,12 @@ import commentRouter from "./routes/comment.routes.js"
 app.use("/api/v1/comments", commentRouter)
 import tweetRouter from "./routes/tweet.routes.js"
 app.use("/api/v1/tweets", tweetRouter)
+import dashboardRouter from "./routes/dashboard.routes.js"
+app.use("/api/v1/dashboard", dashboardRouter)
+import playlistRouter from "./routes/playlist.routes.js"
+app.use("/api/v1/playlist", playlistRouter)
+import subscriptionRouter from "./routes/subscription.routes.js"
+app.use("/api/v1/subscriptions", subscriptionRouter)
+import healthcheckRouter from "./routes/healthcheck.routes.js"
+app.use("/api/v1/healthcheck", healthcheckRouter)
 export { app };

@@ -16,8 +16,13 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     if(existingLike) {
         throw new ApiErrors(400, "Video already liked");
     }
-    const newLike = await Like.create({video : videoId, user: userId});
-    res.status(200).json(new ApiResponse(200, "Video liked successfully", newLike));
+    const newLike = await Like.create({
+      video : videoId, 
+      user: userId,
+      
+    });
+   const views = await Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
+    res.status(200).json(new ApiResponse(200, "Video liked successfully", newLike,views));
 })
 
 
